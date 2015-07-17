@@ -16,6 +16,6 @@ en:
       actions:
         refund: "Refund"
       flash:
-        cancel: "Don't want to use PayPal? No problems."
+        cancel: "Welcome Back!"
         connection_failed: "Could not connect to PayPal."
         generic_error: "PayPal failed. %{reasons}"
