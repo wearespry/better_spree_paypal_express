@@ -1,5 +1,7 @@
 
-<%= link_to(image_tag("https://www.paypal.com/en_US/i/btn/btn_xpressCheckout.gif"), paypal_express_url(:payment_method_id => payment_method.id), :method => :post, :id => "paypal_button") %>
+<%= link_to(paypal_express_url(:payment_method_id => payment_method.id), :method => :post, :id => "paypal_button", :class => 'btn btn-blue paypal') do %>
+  <span>Pay With</span>
+<% end %>
 
 <script>
   SpreePaypalExpress.paymentMethodID = "<%= payment_method.id %>"  

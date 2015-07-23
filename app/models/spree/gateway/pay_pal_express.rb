@@ -27,7 +27,7 @@ module Spree
     end
 
     def auto_capture?
-      true
+      false
     end
 
     def method_type

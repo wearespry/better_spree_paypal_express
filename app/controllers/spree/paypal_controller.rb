@@ -10,6 +10,9 @@ module Spree
       shipping_adjustments = additional_adjustments.shipping
 
       additional_adjustments.eligible.each do |adjustment|
+
+        logger.info 'Adjustment total: '+adjustment.amount.to_s.to_yaml
+
         # Because PayPal doesn't accept $0 items at all. See #10
         # https://cms.paypal.com/uk/cgi-bin/?cmd=_render-content&content_ID=developer/e_howto_api_ECCustomizing
         # "It can be a positive or negative value but not zero."
@@ -26,13 +29,25 @@ module Spree
         }
       end
 
+      logger.info ''
+      logger.info 'Order total: '+order.total.to_f.to_s
+      logger.info ''
+
       pp_request = provider.build_set_express_checkout(express_checkout_request_details(order, items))
+
+      logger.info ''
+      logger.info 'PP Request: '
+      logger.info ''
+      logger.info pp_request.SetExpressCheckoutRequestDetails.PaymentDetails.to_yaml
 
       begin
         pp_response = provider.set_express_checkout(pp_request)
         if pp_response.success?
           redirect_to provider.express_checkout_url(pp_response, useraction: 'commit')
         else
+
+          logger.info pp_response.errors
+
           flash[:error] = Spree.t('flash.generic_error', scope: 'paypal', reasons: pp_response.errors.map(&:long_message).join(" "))
           redirect_to checkout_state_path(:payment)
         end
@@ -43,7 +58,10 @@ module Spree
     end
 
     def confirm
-      order = current_order || raise(ActiveRecord::RecordNotFound)
+      # order = current_order || raise(ActiveRecord::RecordNotFound)
+
+      order = Spree::Order.last
+
       order.payments.create!({
         source: Spree::PaypalExpressCheckout.create({
           token: params[:token],
@@ -52,7 +70,19 @@ module Spree
         amount: order.total,
         payment_method: payment_method
       })
-      order.next
+
+      order.clone_shipping_address if order.bill_address == nil
+
+      order.state = 'confirm'
+      result = order.save
+
+      logger.info ''
+      logger.info 'Order has billing address: '
+      logger.info order.bill_address.to_yaml
+      logger.info 'Order saved: '
+      logger.info result
+      logger.info ''
+
       if order.complete?
         flash.notice = Spree.t(:order_processed_successfully)
         flash[:order_completed] = true
@@ -62,6 +92,49 @@ module Spree
         redirect_to checkout_state_path(order.state)
       end
     end
+
+
+
+    # temporarily hard coded. need to be moved elsewhere
+    def user_credentials
+      {
+        :VERSION => 124.0,
+        :USER => "arden13-facilitator_api1.mac.com",
+        :PWD => "5QC7R5DPRBTSVDUN",
+        :SIGNATURE => "AFcWxV21C7fd0v3bYYYRCpSSRl31A3AWUks7GwLaH9yCpAOsJUiMsEkg",
+      }
+    end
+
+    def do_express_checkout_payment(pmt)
+      payment_request_object = {
+        :METHOD => 'DoExpressCheckoutPayment',
+        :TOKEN => pmt.source.token,
+        :PAYERID => pmt.source.payer_id,
+        :PAYMENTACTION => 'Sale',
+        :AMT => pmt.amount.to_f
+      }
+
+      request = payment_request_object.merge(user_credentials)
+
+      options = {
+        body: request
+      }
+
+      pp_response = HTTParty.post("https://api-3t.sandbox.paypal.com/nvp", options)
+      response_object = Rack::Utils.parse_nested_query(pp_response.parsed_response)
+
+      payment_result = pmt.complete
+
+      logger.info 'PP Response ACK: '+response_object['ACK']
+      logger.info 'Message1: '+response_object['L_SHORTMESSAGE0']
+      logger.info 'Message2: '+response_object['L_LONGMESSAGE0']
+      logger.info ''
+      logger.info 'Payment Result:'
+      logger.info payment_result
+      logger.info ''
+
+    end
+    
 
     def cancel
       flash[:notice] = Spree.t('flash.cancel', scope: 'paypal')
@@ -107,46 +180,55 @@ module Spree
     end
 
     def payment_details items
-      # This retrieves the cost of shipping after promotions are applied
-      # For example, if shippng costs $10, and is free with a promotion, shipment_sum is now $10
-      shipment_sum = current_order.shipments.map(&:discounted_cost).sum
+      item_sum = items.sum { |i| i[:Quantity] * i[:Amount][:value] }
 
-      # This calculates the item sum based upon what is in the order total, but not for shipping
-      # or tax.  This is the easiest way to determine what the items should cost, as that
-      # functionality doesn't currently exist in Spree core
-      item_sum = current_order.total - shipment_sum - current_order.additional_tax_total
+      adjusted_ship_total = current_order.ship_total.to_f - 4.95
+
+      if current_order.adjustments.where({:source_id => 5, :eligible => true}).any?
+        logger.info ''
+        logger.info 'Free shipping promotion is eligible'
+        logger.info ''
+          shipment_sum = adjusted_ship_total
+      else
+        logger.info ''
+        logger.info 'Free shipping promotion is NOT eligible'
+        logger.info ''
+          shipment_sum = current_order.ship_total
+      end
+
+      logger.info shipment_sum
 
       if item_sum.zero?
         # Paypal does not support no items or a zero dollar ItemTotal
         # This results in the order summary being simply "Current purchase"
         {
-          OrderTotal: {
-            currencyID: current_order.currency,
-            value: current_order.total
+          :OrderTotal => {
+            :currencyID => current_order.currency,
+            :value => current_order.total
           }
         }
       else
         {
-          OrderTotal: {
-            currencyID: current_order.currency,
-            value: current_order.total
+          :OrderTotal => {
+            :currencyID => current_order.currency,
+            :value => current_order.total
           },
-          ItemTotal: {
-            currencyID: current_order.currency,
-            value: item_sum
+          :ItemTotal => {
+            :currencyID => current_order.currency,
+            :value => item_sum
           },
-          ShippingTotal: {
-            currencyID: current_order.currency,
-            value: shipment_sum,
+          :ShippingTotal => {
+            :currencyID => current_order.currency,
+            :value => shipment_sum
           },
-          TaxTotal: {
-            currencyID: current_order.currency,
-            value: current_order.additional_tax_total
+          :TaxTotal => {
+            :currencyID => current_order.currency,
+            :value => current_order.tax_total
           },
-          ShipToAddress: address_options,
-          PaymentDetailsItem: items,
-          ShippingMethod: "Shipping Method Name Goes Here",
-          PaymentAction: "Sale"
+          :ShipToAddress => address_options,
+          :PaymentDetailsItem => items,
+          :ShippingMethod => "Shipping Method Name Goes Here",
+          :PaymentAction => "Sale"
         }
       end
     end
@@ -173,5 +255,7 @@ module Spree
     def address_required?
       payment_method.preferred_solution.eql?('Sole')
     end
+
+
   end
 end
