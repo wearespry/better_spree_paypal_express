@@ -123,8 +123,6 @@ module Spree
       pp_response = HTTParty.post("https://api-3t.sandbox.paypal.com/nvp", options)
       response_object = Rack::Utils.parse_nested_query(pp_response.parsed_response)
 
-      payment_result = pmt.complete
-
       logger.info 'PP Response ACK: '+response_object['ACK']
       logger.info 'Message1: '+response_object['L_SHORTMESSAGE0']
       logger.info 'Message2: '+response_object['L_LONGMESSAGE0']
@@ -132,6 +130,8 @@ module Spree
       logger.info 'Payment Result:'
       logger.info payment_result
       logger.info ''
+
+      response_object['ACK']
 
     end
     
