@@ -11,8 +11,6 @@ module Spree
 
       additional_adjustments.eligible.each do |adjustment|
 
-        logger.info 'Adjustment total: '+adjustment.amount.to_s.to_yaml
-
         # Because PayPal doesn't accept $0 items at all. See #10
         # https://cms.paypal.com/uk/cgi-bin/?cmd=_render-content&content_ID=developer/e_howto_api_ECCustomizing
         # "It can be a positive or negative value but not zero."
@@ -29,16 +27,7 @@ module Spree
         }
       end
 
-      logger.info ''
-      logger.info 'Order total: '+order.total.to_f.to_s
-      logger.info ''
-
       pp_request = provider.build_set_express_checkout(express_checkout_request_details(order, items))
-
-      logger.info ''
-      logger.info 'PP Request: '
-      logger.info ''
-      logger.info pp_request.SetExpressCheckoutRequestDetails.PaymentDetails.to_yaml
 
       begin
         pp_response = provider.set_express_checkout(pp_request)
@@ -58,9 +47,7 @@ module Spree
     end
 
     def confirm
-      # order = current_order || raise(ActiveRecord::RecordNotFound)
-
-      order = Spree::Order.last
+      order = current_order || raise(ActiveRecord::RecordNotFound)
 
       order.payments.create!({
         source: Spree::PaypalExpressCheckout.create({
@@ -95,7 +82,8 @@ module Spree
 
 
 
-    # temporarily hard coded. need to be moved elsewhere
+    # API credentials stored in environment variables
+    # http://railsapps.github.io/rails-environment-variables.html
     def user_credentials
       {
         :VERSION => ENV['PP_VERSION'],
@@ -122,21 +110,20 @@ module Spree
         body: request
       }
 
+      # Paypal Express Checkout API Endpoint
+      # https://developer.paypal.com/webapps/developer/docs/classic/api/#ec
       request_url = ENV['PP_SIG_URL']
 
       return false if !request_url
 
-      logger.info ''
-      logger.info request_url
-      logger.info ''
-
       pp_response = HTTParty.post(request_url, options)
       response_object = Rack::Utils.parse_nested_query(pp_response.parsed_response)
 
-      logger.info 'PP Response ACK: '+response_object['ACK'] if response_object['ACK'].present?
-      logger.info 'Message1: '+response_object['L_SHORTMESSAGE0'] if response_object['L_SHORTMESSAGE0'].present?
-      logger.info 'Message2: '+response_object['L_LONGMESSAGE0'] if response_object['L_LONGMESSAGE0'].present?
-      logger.info ''
+      if response_object['ACK'].present? && response_object['ACK'] != 'Success'
+        logger.info 'PP Response: '+response_object['ACK'] if response_object['ACK'].present?
+        logger.info 'Message: '+response_object['L_LONGMESSAGE0'] if response_object['L_LONGMESSAGE0'].present?
+        logger.info ''
+      end
 
       response_object['ACK']
 
@@ -192,18 +179,10 @@ module Spree
       adjusted_ship_total = current_order.ship_total.to_f - 4.95
 
       if current_order.adjustments.where({:source_id => 5, :eligible => true}).any?
-        logger.info ''
-        logger.info 'Free shipping promotion is eligible'
-        logger.info ''
           shipment_sum = adjusted_ship_total
       else
-        logger.info ''
-        logger.info 'Free shipping promotion is NOT eligible'
-        logger.info ''
           shipment_sum = current_order.ship_total
       end
-
-      logger.info shipment_sum
 
       if item_sum.zero?
         # Paypal does not support no items or a zero dollar ItemTotal
