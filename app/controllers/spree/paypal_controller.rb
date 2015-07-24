@@ -98,10 +98,10 @@ module Spree
     # temporarily hard coded. need to be moved elsewhere
     def user_credentials
       {
-        :VERSION => 124.0,
-        :USER => "arden13-facilitator_api1.mac.com",
-        :PWD => "5QC7R5DPRBTSVDUN",
-        :SIGNATURE => "AFcWxV21C7fd0v3bYYYRCpSSRl31A3AWUks7GwLaH9yCpAOsJUiMsEkg",
+        :VERSION => ENV['PP_VERSION'],
+        :USER => ENV['PP_USER'],
+        :PWD => ENV['PP_PWD'],
+        :SIGNATURE => ENV['PP_SIGNATURE']
       }
     end
 
