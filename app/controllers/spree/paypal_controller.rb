@@ -133,9 +133,9 @@ module Spree
       pp_response = HTTParty.post(request_url, options)
       response_object = Rack::Utils.parse_nested_query(pp_response.parsed_response)
 
-      logger.info 'PP Response ACK: '+response_object['ACK']
-      logger.info 'Message1: '+response_object['L_SHORTMESSAGE0']
-      logger.info 'Message2: '+response_object['L_LONGMESSAGE0']
+      logger.info 'PP Response ACK: '+response_object['ACK'] if response_object['ACK'].present?
+      logger.info 'Message1: '+response_object['L_SHORTMESSAGE0'] if response_object['L_SHORTMESSAGE0'].present?
+      logger.info 'Message2: '+response_object['L_LONGMESSAGE0'] if response_object['L_LONGMESSAGE0'].present?
       logger.info ''
 
       response_object['ACK']
