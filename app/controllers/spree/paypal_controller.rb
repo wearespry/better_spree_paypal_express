@@ -116,6 +116,8 @@ module Spree
 
       request = payment_request_object.merge(user_credentials)
 
+      logger.info request.to_yaml
+
       options = {
         body: request
       }
@@ -126,9 +128,6 @@ module Spree
       logger.info 'PP Response ACK: '+response_object['ACK']
       logger.info 'Message1: '+response_object['L_SHORTMESSAGE0']
       logger.info 'Message2: '+response_object['L_LONGMESSAGE0']
-      logger.info ''
-      logger.info 'Payment Result:'
-      logger.info payment_result
       logger.info ''
 
       response_object['ACK']
