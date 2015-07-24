@@ -122,7 +122,15 @@ module Spree
         body: request
       }
 
-      pp_response = HTTParty.post("https://api-3t.paypal.com/nvp", options)
+      request_url = ENV['PP_SIG_URL']
+
+      return false if !request_url
+
+      logger.info ''
+      logger.info request_url
+      logger.info ''
+
+      pp_response = HTTParty.post(request_url, options)
       response_object = Rack::Utils.parse_nested_query(pp_response.parsed_response)
 
       logger.info 'PP Response ACK: '+response_object['ACK']
