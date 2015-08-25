@@ -28,6 +28,9 @@ module Spree
         }
       end
 
+      log.order
+      log.items
+
       pp_request = provider.build_set_express_checkout(express_checkout_request_details(order, items))
 
       begin
