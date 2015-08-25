@@ -5,7 +5,8 @@ module Spree
       order = current_order || raise(ActiveRecord::RecordNotFound)
       items = order.line_items.map(&method(:line_item))
 
-      additional_adjustments = order.all_adjustments.additional
+      #additional_adjustments = order.all_adjustments.additional
+      additional_adjustments = order.all_adjustments
       tax_adjustments = additional_adjustments.tax
       shipping_adjustments = additional_adjustments.shipping
 
